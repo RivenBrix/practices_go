@@ -1,0 +1,71 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
+)
+
+var collection *mongo.Collection
+
+type Person struct {
+	Nombre string
+	Email  string
+	Fecha  string
+}
+
+func main() {
+
+	clientOptions := options.Client().ApplyURI("mongodb+srv://cucho23:Elgotto@cluster0.v02qv6d.mongodb.net/test")
+	client, err := mongo.Connect(context.Background(), clientOptions)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	defer client.Disconnect(context.Background())
+
+	err = client.Ping(context.Background(), readpref.Primary())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Conexión exitosa con MongoDB!")
+
+	collection := client.Database("test").Collection("users")
+
+	// Definir un filtro para la consulta (por ejemplo, todos los documentos)
+	filter := bson.D{}
+
+	// Realizar la consulta a la base de datos
+	cur, err := collection.Find(ctx, filter)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Iterar sobre los resultados de la consulta
+	defer cur.Close(ctx)
+	for cur.Next(ctx) {
+		var person Person
+		if err := cur.Decode(&person); err != nil {
+			log.Fatal(err)
+		}
+
+		// Hacer algo con los datos recuperados
+		fmt.Printf("Nombre: %s, Email: %s, Fecha: %s\n", person.Nombre, person.Email, person.Fecha)
+	}
+
+	// Verificar si ocurrieron errores durante la iteración
+	if err := cur.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+}
