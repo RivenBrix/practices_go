@@ -1,0 +1,26 @@
+//vscode extension: humao.rest-client
+
+@me = http://127.0.0.1:8080
+
+### NUEVO USUARIO
+POST {{me}}/api/insert
+Content-Type: application/json
+
+{
+  "Nombre": "Ejemplo2",
+  "Email": "ejemplo2@example.com",
+  "Fecha": "2023-12-24",
+  "Password": "contraseña2",
+  "Rol": "usuario2"
+}
+
+### ACTUALIZACIÓN USUARIO
+### Reemplaza {id} con el ID del usuario que veas en tu cluster
+PUT {{me}}/users/658c868f9ad4ed0e6cf73aa3   
+Content-Type: application/json
+
+{
+  "Nombre": "NuevoNombre",
+  "Email": "nuevo@example.com",
+  "Fecha": "2023-12-25"
+}

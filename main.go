@@ -1,28 +1,21 @@
 package main
 
 import (
+	"app/config"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
 
-	// "github.com/rs/cors"
-
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var collection *mongo.Collection
-var client *mongo.Client
-
-// c := cors.AllowAll()
-
-// handler := c.Handler(router)
-
-// log.Fatal(http.ListenAndServe(":8080", handler))
 
 type Person struct {
 	_id      string `json:"_id"`
@@ -33,40 +26,13 @@ type Person struct {
 	Rol      string `json:"Rol"`
 }
 
-func InsertData(w http.ResponseWriter, r *http.Request) {
-	var person Person
-	err := json.NewDecoder(r.Body).Decode(&person)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		log.Printf("Error al decodificar datos de la solicitud: %v", err)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	_, err = collection.InsertOne(ctx, person)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Printf("Error al insertar datos en MongoDB: %v", err)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	log.Println("Datos insertados con éxito en MongoDB:", person)
-}
-
 func main() {
-	clientOptions := options.Client().ApplyURI("mongodb+srv://cucho23:Elgotto@cluster0.v02qv6d.mongodb.net/test") // Reemplaza con tu URL de MongoDB.
-	client, err := mongo.Connect(context.Background(), clientOptions)
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	defer client.Disconnect(context.Background())
+	config.GetConfig()
+	defer config.Client.Disconnect(context.Background())
 
 	// Configura la colección
-	collection = client.Database("test").Collection("users") // Reemplaza con tu base de datos y colección.
+	collection = config.Client.Database("test").Collection("users") // Reemplaza con tu base de datos y colección.
 
 	// Crear el enrutador HTTP utilizando mux
 	router := mux.NewRouter()
@@ -82,7 +48,27 @@ func main() {
 	log.Println("Servidor iniciado en http://192.168.1.42:8080")
 
 	// ":8080"
-	log.Fatal(http.ListenAndServe("192.168.1.42:8080", router))
+	log.Fatal(http.ListenAndServe("localhost:8080", router))
+}
+
+func InsertData(w http.ResponseWriter, r *http.Request) {
+	var person Person
+	err := json.NewDecoder(r.Body).Decode(&person)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Printf("Error al decodificar datos de la solicitud: %v", err)
+		return
+	}
+
+	_, err = collection.InsertOne(context.Background(), person)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("Error al insertar datos en MongoDB: %v", err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	log.Println("Datos insertados con éxito en MongoDB:", person)
 }
 
 func GetUsers(w http.ResponseWriter, r *http.Request) {
@@ -167,8 +153,16 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	params := mux.Vars(r)
-	filter := bson.D{{"_id", params["id"]}}
+	// Convertir el parámetro "id" a un ObjectId
+	objectID, err := primitive.ObjectIDFromHex(params["id"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Printf("Error al convertir el ID a ObjectId: %v", err)
+		return
+	}
 
+	filter := bson.D{{"_id", objectID}}
+	fmt.Println("Filter, ", filter)
 	update := bson.D{
 		{"$set", bson.D{
 			{"Nombre", person.Nombre},
@@ -177,11 +171,15 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 		}},
 	}
 
-	_, err = collection.UpdateOne(ctx, filter, update)
+	fmt.Println("Update, ", update)
+
+	result, err := collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	fmt.Println("Result, ", result)
 
 	w.WriteHeader(http.StatusOK)
 	log.Println("Datos actualizados con éxito en MongoDB:", person)
